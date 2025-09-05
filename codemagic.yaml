@@ -1,11 +1,11 @@
-# Versione definitiva con l'attivazione dell'integrazione App Store Connect
+# Versione definitiva che collega l'integrazione al gruppo di variabili corretto
 workflows:
   capacitor-ios-app-store:
     name: Capacitor iOS App Store Build
-    # --- BLOCCO AGGIUNTO ---
+    # --- BLOCCO MODIFICATO: Il nome dell'integrazione ora corrisponde al nome del gruppo di variabili ---
     integrations:
-      app_store_connect: Codemagic # Nome di default per l'integrazione
-    # --- FINE BLOCCO AGGIUNTO ---
+      app_store_connect: app_store_credentials
+    # --- FINE BLOCCO MODIFICATO ---
     instance_type: mac_mini_m2
     environment:
       groups:
