@@ -1,6 +1,12 @@
 {
   "appId": "com.steexesimplegames.colorswipeduel",
   "appName": "Color Swipe Duel",
-  "webDir": "www"
-  "bundledWebRuntime": false
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "npmClient": "npm",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  }
 }
