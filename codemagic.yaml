@@ -4,21 +4,22 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       groups:
-        - app_store_credentials # Un gruppo sicuro per le nostre chiavi
+        - app_store_credentials 
       vars:
         APP_ID: "com.tuonome.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE
     scripts:
       - name: Install npm dependencies
         script: | 
           npm install
-      # --- RIGA AGGIUNTA PER RISOLVERE L'ERRORE ---
       - name: Set execute permissions for Capacitor CLI
         script: | 
           chmod +x ./node_modules/.bin/cap
-      # --- FINE RIGA AGGIUNTA ---
-      - name: Sync Capacitor project
+      # --- BLOCCO MODIFICATO: Aggiunge la piattaforma prima di sincronizzare ---
+      - name: Add and Sync Capacitor iOS platform
         script: | 
+          npx cap add ios
           npx cap sync ios
+      # --- FINE BLOCCO MODIFICATO ---
       - name: Set up code signing
         script: | 
           app-store-connect fetch-signing-files "$APP_ID" --type IOS_APP_STORE --create
