@@ -1,4 +1,4 @@
-# Versione aggiornata con Node.js 20
+# Versione definitiva che si affida alla firma automatica di Codemagic
 workflows:
   capacitor-ios-app-store:
     name: Capacitor iOS App Store Build
@@ -7,12 +7,10 @@ workflows:
       groups:
         - app_store_credentials
       vars:
-        APP_ID: "ccom.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE ESATTO
+        APP_ID: "com.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE ESATTO
         XCODE_WORKSPACE: "App.xcworkspace"
         XCODE_SCHEME: "App"
-      # --- RIGA MODIFICATA ---
-      node: 20 
-      # --- FINE RIGA MODIFICATA ---
+      node: 20
     scripts:
       - name: Install npm dependencies
         script: | 
@@ -24,12 +22,9 @@ workflows:
         script: | 
           npx cap add ios
           npx cap sync ios
-      - name: Set up code signing
-        script: | 
-          app-store-connect fetch-signing-files "$APP_ID" --type IOS_APP_STORE --create
+      # LO SCRIPT PROBLEMATICO È STATO RIMOSSO
       - name: Build and archive iOS app
         script: | 
-          xcode-project use-profiles
           xcode-project build-ipa --workspace "ios/App/$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
