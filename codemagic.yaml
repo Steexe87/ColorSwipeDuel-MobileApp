@@ -1,4 +1,4 @@
-# Versione definitiva che si affida alla firma automatica di Codemagic
+# Versione finale con il comando 'use-profiles' ripristinato
 workflows:
   capacitor-ios-app-store:
     name: Capacitor iOS App Store Build
@@ -22,9 +22,12 @@ workflows:
         script: | 
           npx cap add ios
           npx cap sync ios
-      # LO SCRIPT PROBLEMATICO È STATO RIMOSSO
+      # --- LO SCRIPT PROBLEMATICO È STATO RIMOSSO, MA QUELLO SUCCESSIVO VA CORRETTO ---
       - name: Build and archive iOS app
         script: | 
+          # --- RIGA MANCANTE REINSERITA ---
+          xcode-project use-profiles
+          # --- FINE RIGA REINSERITA ---
           xcode-project build-ipa --workspace "ios/App/$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
