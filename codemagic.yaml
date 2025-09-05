@@ -6,7 +6,7 @@ workflows:
       groups:
         - app_store_credentials 
       vars:
-        APP_ID: "com.tuonome.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE
+        APP_ID: "om.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE
     scripts:
       - name: Install npm dependencies
         script: | 
