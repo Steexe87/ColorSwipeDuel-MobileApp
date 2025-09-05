@@ -1,0 +1,1615 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <title>Color Swipe Duel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --border-color: rgba(255, 255, 255, 0.8);
+            --text-color: #ffffff;
+            --shadow-color: rgba(0, 0, 0, 0.5);
+            --go-color: #FFD700;
+            --main-blue: #3498db;
+            --main-red: #e74c3c;
+            --dark-background: #1a1a1a;
+            --color-on: #2ecc71;
+            --color-off: #c0392b;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--dark-background);
+            color: var(--text-color);
+            touch-action: none;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            position: relative;
+        }
+
+        .player-area {
+            flex: 1;
+            transition: background-color: 0.1s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            z-index: 0;
+        }
+
+        #cpu-area { background-color: var(--main-blue); }
+        #player-area { background-color: var(--main-red); }
+
+        .player-info {
+            position: absolute;
+            right: 20px;
+            text-align: right;
+            font-size: clamp(1em, 2vw, 1.2em);
+            font-weight: 700;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            z-index: 3;
+        }
+        #cpu-info { top: 65px; }
+        #player-info { bottom: 65px; }
+        .player-info .tier { font-size: 1.5em; vertical-align: middle; }
+        .player-info .score { color: #ccc; font-weight: 400; }
+
+        .divider {
+            height: 4px;
+            background-color: var(--border-color);
+            width: 100%;
+            position: absolute;
+            top: 50%;
+            left: 0;
+            transform: translateY(-50%);
+            z-index: 1;
+        }
+
+        #target-square {
+            width: clamp(135px, 22.5vw, 188px);
+            height: clamp(135px, 22.5vw, 188px);
+            background-color: #ffffff;
+            border: 4px solid var(--border-color);
+            border-radius: 35px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 3;
+            cursor: pointer;
+            box-shadow: 0 0 25px var(--shadow-color);
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        
+        #target-square:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 0 40px var(--shadow-color);
+        }
+
+        #central-display {
+            font-weight: 700;
+            text-align: center;
+        }
+        
+        #central-display.countdown {
+            font-size: clamp(7em, 15vw, 10em);
+            color: var(--go-color);
+            text-shadow: 0 0 15px rgba(0,0,0,0.8);
+        }
+        #central-display.hex-code {
+            font-size: clamp(1.4em, 3.5vw, 2em);
+            color: var(--text-color);
+            text-shadow: 0 0 10px var(--shadow-color);
+        }
+
+        .score-container {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            padding: 10px;
+            z-index: 5;
+        }
+
+        #cpu-score-container { top: 10px; }
+        #player-score-container { bottom: 10px; }
+
+        .score-dot {
+            width: 15px;
+            height: 15px;
+            background-color: transparent;
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            transition: background-color 0.3s ease;
+        }
+
+        .score-dot.filled { background-color: var(--border-color); }
+
+        #timer-display {
+            position: absolute;
+            top: 22%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: 700;
+            z-index: 4;
+            text-shadow: 0 0 10px var(--shadow-color);
+            transition: font-size 0.2s ease-out;
+            font-size: clamp(4em, 10vw, 6em);
+        }
+
+        #timer-display.urgent { 
+            font-size: clamp(6em, 15vw, 8em); 
+        }
+        
+        .message-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            text-align: center;
+            transition: opacity 0.3s ease;
+            opacity: 1;
+        }
+        
+        .overlay-blur {
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+
+        .menu-background {
+            background: linear-gradient(45deg, #e74c3c, #f1c40f, #3498db, #8e44ad);
+            background-size: 400% 400%;
+            animation: gradient-scroll 15s ease infinite;
+        }
+
+        @keyframes gradient-scroll {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .message-overlay.hidden { 
+            opacity: 0;
+            pointer-events: none;
+        }
+        .message-overlay h1 { font-size: clamp(2.5em, 6vw, 3em); margin-bottom: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);}
+        .message-overlay p { font-size: clamp(1em, 2.5vw, 1.2em); margin: 0 15px 20px 15px; max-width: 600px; text-shadow: 0 1px 3px rgba(0,0,0,0.5);}
+        .message-overlay button {
+            padding: 15px 30px;
+            font-size: clamp(1em, 2.5vw, 1.2em);
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+            margin: 5px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .message-overlay button:hover { transform: scale(1.05); }
+        .message-overlay button:disabled { background-color: #555; cursor: not-allowed; }
+
+        .overlay-input {
+            padding: 12px;
+            border-radius: 10px;
+            border: 2px solid var(--border-color);
+            background-color: rgba(0,0,0,0.3);
+            color: white;
+            font-size: 1.1em;
+            text-align: center;
+            margin: 5px 0 15px 0;
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .button-primary { background-color: var(--main-blue); }
+        .button-primary:hover { background-color: #2980b9; }
+        .button-secondary { background-color: #8e44ad; }
+        .button-secondary:hover { background-color: #7b2c9f; }
+        .button-tertiary { background-color: #7f8c8d; }
+        .button-tertiary:hover { background-color: #6c7a7b; }
+        #difficulty-selection button.easy { background-color: #2ecc71; }
+        #difficulty-selection button.medium { background-color: #f1c40f; }
+        #difficulty-selection button.hard { background-color: #c0392b; }
+        
+        .button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        @media (min-width: 600px) {
+            .button-container {
+                flex-direction: row;
+            }
+        }
+
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: stretch;
+            width: 80%;
+            max-width: 400px;
+            margin-bottom: 20px;
+        }
+        .option-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.2em;
+        }
+        .toggle-btn {
+            width: 100px;
+            padding: 10px 15px;
+        }
+        .toggle-btn.on { background-color: var(--color-on); }
+        .toggle-btn.off { background-color: var(--color-off); }
+
+        #leaderboard-overlay .button-container {
+            margin-top: 20px;
+        }
+        #current-user-rank {
+            background-color: rgba(255, 215, 0, 0.2);
+            font-weight: bold;
+        }
+
+        #go-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: clamp(8em, 20vw, 10em);
+            font-weight: 700;
+            color: var(--go-color);
+            text-shadow: 0 0 15px rgba(0,0,0,0.8);
+            z-index: 5;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        
+        #go-message.show { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+
+        #cpu-obfuscation-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(10, 10, 10, 0.9);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            z-index: 2;
+            display: none;
+        }
+
+        .feedback-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 5;
+            font-size: clamp(1.5em, 3vw, 2em);
+            font-weight: bold;
+            text-shadow: 0 0 8px rgba(0,0,0,0.7);
+            display: none;
+        }
+
+        .feedback-message.visible {
+            display: block;
+        }
+
+        .result-display {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .result-score {
+            font-size: clamp(2.5em, 5vw, 3em);
+            font-weight: 700;
+            color: var(--text-color);
+            text-shadow: 0 0 10px var(--shadow-color);
+        }
+
+        .winner-indicator {
+            font-size: clamp(2em, 4vw, 2.5em);
+            color: var(--go-color);
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            display: none;
+        }
+        
+        #pause-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 3px solid var(--border-color);
+            background-color: rgba(0,0,0,0.5);
+            color: var(--border-color);
+            font-size: 1.5em;
+            font-weight: 700;
+            cursor: pointer;
+            z-index: 20;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #timer-display.repositioned {
+            top: 50%;
+        }
+        
+        .scrollable-overlay {
+            justify-content: flex-start;
+            overflow-y: auto;
+            touch-action: auto;
+            padding: 40px 20px;
+            box-sizing: border-box;
+        }
+
+        #auth-toggle {
+            background: none;
+            border: none;
+            color: var(--go-color);
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-top: 15px;
+        }
+
+        #leaderboard-table {
+            width: 90%;
+            max-width: 600px;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        #leaderboard-table th, #leaderboard-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        #leaderboard-table th { font-size: 1.2em; }
+        #leaderboard-table td:nth-child(1) { width: 10%; font-weight: bold; }
+        #leaderboard-table td:nth-child(2) { width: 60%; }
+        #leaderboard-table td:nth-child(3) { width: 30%; text-align: right; }
+
+        #main-menu h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            font-size: clamp(2.5em, 10vw, 4.5em);
+            color: var(--go-color);
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+        }
+        
+        #player-profile-display {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: auto;
+            white-space: nowrap;
+            padding: 10px 20px;
+            background-color: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            font-size: clamp(0.9em, 2.5vw, 1.1em);
+            text-align: center;
+            z-index: 11;
+        }
+
+        #player-profile-display .tier {
+            font-size: 1.5em;
+        }
+        
+        #main-menu #play-vs-cpu-btn { background-color: #3498db; }
+        #main-menu #play-vs-player-btn { background-color: #2ecc71; }
+        #main-menu #leaderboard-btn { background-color: #f1c40f; }
+        #main-menu #options-btn { background-color: #8e44ad; }
+        #main-menu #rules-btn { background-color: #e74c3c; }
+
+        #main-menu #play-vs-cpu-btn:hover { background-color: #2980b9; }
+        #main-menu #play-vs-player-btn:hover { background-color: #27ae60; }
+        #main-menu #leaderboard-btn:hover { background-color: #d8ac0c; }
+        #main-menu #options-btn:hover { background-color: #7b2c9f; }
+        #main-menu #rules-btn:hover { background-color: #c0392b; }
+        
+        #room-code-display {
+            font-size: clamp(2.5em, 8vw, 4em);
+            font-weight: 700;
+            color: var(--go-color);
+            background-color: rgba(0,0,0,0.3);
+            padding: 15px 30px;
+            border-radius: 15px;
+            border: 2px solid var(--border-color);
+            margin: 20px 0;
+            letter-spacing: 5px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .player-info {
+                font-size: clamp(0.8em, 2.5vw, 1em); 
+                right: 10px; 
+                width: 45%; 
+                white-space: nowrap; 
+                overflow: hidden;
+                text-overflow: ellipsis; 
+            }
+            #cpu-info { top: 50px; }
+            #player-info { bottom: 50px; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div id="cpu-area" class="player-area">
+            <div id="cpu-info" class="player-info"></div>
+            <div id="cpu-obfuscation-overlay"></div>
+            <div class="feedback-message">Choice Locked!</div>
+            <div class="result-display">
+                <div class="winner-indicator">▼</div>
+                <div class="result-score"></div>
+            </div>
+        </div>
+
+        <div id="player-area" class="player-area">
+            <div id="player-info" class="player-info"></div>
+            <div class="feedback-message">Choice Locked!</div>
+            <div class="result-display">
+                <div class="result-score"></div>
+                <div class="winner-indicator">▲</div>
+            </div>
+        </div>
+
+        <div id="cpu-score-container" class="score-container"></div>
+        <div id="player-score-container" class="score-container"></div>
+        
+        <div class="divider"></div>
+        <div id="target-square">
+            <div id="central-display" class="countdown"></div>
+        </div>
+        <div id="timer-display"></div>
+        <div id="go-message">Go!</div>
+        <button id="pause-button">X</button>
+
+        <div id="login-overlay" class="message-overlay menu-background">
+            <h1 id="auth-title">Login</h1>
+            <p id="auth-subtitle">Enter your credentials to play online.</p>
+            <input type="text" id="username-input" class="overlay-input" placeholder="Username (3-10 chars)" maxlength="10" autocomplete="username">
+            <input type="password" id="password-input" class="overlay-input" placeholder="Password" autocomplete="current-password">
+            <button id="auth-btn" class="button-primary">Enter</button>
+            <p id="auth-error" style="color: #FF4747; display: none; margin-top: 10px;"></p>
+            <button id="auth-toggle">Don't have an account? Register</button>
+        </div>
+        
+        <div id="main-menu" class="message-overlay menu-background hidden">
+            <div id="player-profile-display"></div>
+            <h1>Color Swipe Duel</h1>
+            <p>Select a game mode.</p>
+            <div class="button-container">
+                <button id="play-vs-cpu-btn" class="button-primary">Play vs CPU</button>
+                <button id="play-vs-player-btn" class="button-primary">Play vs Player</button>
+                <button id="leaderboard-btn" class="button-secondary">Leaderboard</button>
+                <button id="options-btn" class="button-secondary">Options</button>
+                <button id="rules-btn" class="button-secondary">Rules</button>
+            </div>
+        </div>
+
+        <div id="online-mode-menu" class="message-overlay menu-background hidden">
+            <h1>Online Play</h1>
+            <p>Choose your online experience.</p>
+            <div class="button-container">
+                <button id="casual-mode-btn" class="button-primary">Casual Mode</button>
+                <button id="ranked-mode-btn" class="button-secondary">Ranked Mode</button>
+            </div>
+            <button id="back-to-main-from-online-btn" class="button-tertiary" style="margin-top: 20px;">Back</button>
+        </div>
+
+        <div id="multiplayer-menu" class="message-overlay menu-background hidden">
+            <h1 id="multiplayer-title">Multiplayer</h1>
+            <p>Choose how you want to play.</p>
+            <div class="button-container">
+                <button id="create-room-btn" class="button-primary">Create Private Room</button>
+                <button id="join-room-btn" class="button-primary">Join Room</button>
+                <button id="random-match-btn" class="button-secondary">Random Match</button>
+            </div>
+            <button id="back-to-online-mode-btn" class="button-tertiary" style="margin-top: 20px;">Back</button>
+        </div>
+
+        <div id="waiting-room-overlay" class="message-overlay menu-background hidden">
+            <h1>Waiting for an opponent...</h1>
+            <p>Share this code with a friend to invite them:</p>
+            <div id="room-code-display" title="Click to copy"></div>
+            <div class="button-container" style="margin-top:15px;">
+                <button id="share-room-code-btn" class="button-primary">Share Code</button>
+                <button id="cancel-private-room-btn" class="button-tertiary">Cancel</button>
+            </div>
+            </div>
+
+        <div id="options-overlay" class="message-overlay menu-background hidden">
+            <h1>Options</h1>
+            <div class="options-container">
+                <div class="option-row">
+                    <span>Music</span>
+                    <button id="toggle-music-btn" class="toggle-btn"></button>
+                </div>
+                <div class="option-row">
+                    <span>Sound Effects</span>
+                    <button id="toggle-sfx-btn" class="toggle-btn"></button>
+                </div>
+            </div>
+            <button id="close-options-btn" class="button-primary">Close</button>
+        </div>
+        
+        <div id="difficulty-selection" class="message-overlay menu-background hidden">
+            <h1>Choose the difficulty</h1>
+            <div class="button-container">
+                 <button class="difficulty-btn easy" data-difficulty="easy">Easy</button>
+                 <button class="difficulty-btn medium" data-difficulty="medium">Medium</button>
+                 <button class="difficulty-btn hard" data-difficulty="hard">Hard</button>
+            </div>
+        </div>
+
+        <div id="leaderboard-overlay" class="message-overlay menu-background scrollable-overlay hidden">
+            <h1>Leaderboard</h1>
+            <table id="leaderboard-table">
+                <thead>
+                    <tr><th>#</th><th>Player</th><th>Score</th></tr>
+                </thead>
+                <tbody id="leaderboard-body">
+                </tbody>
+            </table>
+            <div class="button-container">
+                <button id="my-position-btn" class="button-secondary">My Position</button>
+                <button id="close-leaderboard-btn" class="button-primary">Close</button>
+            </div>
+        </div>
+
+        <div id="rules-overlay" class="message-overlay menu-background scrollable-overlay hidden">
+            <h1>Game Rules</h1>
+            <p>The goal is to choose a color shade that is as close as possible to the one shown in the central square.</p>
+            
+            <h4>How to Play:</h4>
+            <p><strong>Change Color:</strong> To generate a new color, swipe your finger from bottom to top (a "swipe-up" motion) anywhere on your half of the screen, which is the bottom part of the display.</p>
+            <p><strong>Confirm Choice:</strong> When you think you have the right color, tap the central square to lock in your decision. Once confirmed, the choice is final for the current round.</p>
+            <p><strong>Timer:</strong> The first player to lock in their color starts a <strong>3-second</strong> timer, within which the opponent must make their final choice.</p>
+            
+            <h4>Scoring and Winning:</h4>
+            <p>The player whose color is closest to the target color wins the round. In the results screen, the player that obtains the lowest number is the one that chose the color closest to the target. The match is won by the first player to reach <strong>5 points</strong>.</p>
+            
+            <h4>Online Game Modes:</h4>
+            <p>When playing online, you can choose between two modes:</p>
+            <p><strong>Casual Mode:</strong> Play for fun! Wins and losses in this mode do not affect your Rank Score or your position on the leaderboard. It's the perfect place to practice or play with friends without pressure.</p>
+            <p><strong>Ranked Mode:</strong> This is the competitive mode. Winning or losing will change your Rank Score based on the Elo system. Beating an opponent with a higher score will earn you more points, while losing to an opponent with a lower score will cause you to lose more.</p>
+            <p><strong>Rank Score Variation (Elo):</strong> The amount of points gained or lost depends on the Rank Score difference between you and your opponent. Winning against a much stronger player will result in a significant point gain, while defeating a much lower-ranked opponent will give you only a few points. Conversely, losing to a much lower-level player will cost you many more points than a loss against an opponent of equal or higher rank.</p>
+            
+            <p>
+                <strong>🥉 Bronze:</strong> 0 - 1099<br>
+                <strong>🥈 Silver:</strong> 1100 - 1299<br>
+                <strong>🥇 Gold:</strong> 1300 - 1499<br>
+                <strong>💎 Platinum:</strong> 1500 - 1699<br>
+                <strong>✨ Diamond:</strong> 1700+
+            </p>
+
+            <h4>Round Duration (Online):</h4>
+            <p>In online matches, the duration of each round depends on the level of the player with the highest Rank Score in the match, to ensure an appropriate challenge:</p>
+            <p>
+                <strong>🥉 Bronze:</strong> 20 seconds<br>
+                <strong>🥈 Silver:</strong> 18 seconds<br>
+                <strong>🥇 Gold:</strong> 15 seconds<br>
+                <strong>💎 Platinum:</strong> 12 seconds<br>
+                <strong>✨ Diamond:</strong> 10 seconds
+            </p>
+            <h4>Round Duration by Difficulty (vs CPU):</h4>
+            <p>
+                <strong>Easy:</strong> 20 seconds<br>
+                <strong>Medium:</strong> 15 seconds<br>
+                <strong>Hard:</strong> 10 seconds
+            </p>
+            <button id="close-rules-btn" class="button-primary">Got it!</button>
+        </div>
+
+        <div id="pause-menu" class="message-overlay overlay-blur hidden">
+            <h1>Paused</h1>
+            <div class="button-container">
+                <button id="resume-btn" class="button-primary">Resume</button>
+                <button id="abandon-btn" class="button-tertiary">Abandon Match</button>
+            </div>
+        </div>
+
+        <div id="message-overlay" class="message-overlay overlay-blur hidden">
+            <h1></h1>
+            <p></p>
+            <div id="message-buttons" class="button-container"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- GLOBAL INITIALIZATION ---
+        const cpuArea = document.getElementById('cpu-area');
+        const playerArea = document.getElementById('player-area');
+        const targetSquare = document.getElementById('target-square');
+        const timerDisplay = document.getElementById('timer-display');
+        const centralDisplay = document.getElementById('central-display');
+        const goMessage = document.getElementById('go-message');
+        const cpuObfuscationOverlay = document.getElementById('cpu-obfuscation-overlay');
+        const playerFeedbackMessage = document.querySelector('#player-area .feedback-message');
+        const cpuFeedbackMessage = document.querySelector('#cpu-area .feedback-message');
+        const playerResultDisplay = document.querySelector('#player-area .result-display');
+        const cpuResultDisplay = document.querySelector('#cpu-area .result-display');
+        const playerResultScore = document.querySelector('#player-area .result-score');
+        const cpuResultScore = document.querySelector('#cpu-area .result-score');
+        const playerWinnerIndicator = document.querySelector('#player-area .winner-indicator');
+        const cpuWinnerIndicator = document.querySelector('#cpu-area .winner-indicator');
+        const pauseButton = document.getElementById('pause-button');
+        const playerInfoDisplay = document.getElementById('player-info');
+        const cpuInfoDisplay = document.getElementById('cpu-info');
+        const playerProfileDisplay = document.getElementById('player-profile-display');
+        
+        const mainMenu = document.getElementById('main-menu');
+        const difficultySelection = document.getElementById('difficulty-selection');
+        const rulesOverlay = document.getElementById('rules-overlay');
+        const pauseMenu = document.getElementById('pause-menu');
+        const messageOverlay = document.getElementById('message-overlay');
+        const messageButtons = document.getElementById('message-buttons');
+        const loginOverlay = document.getElementById('login-overlay');
+        const leaderboardOverlay = document.getElementById('leaderboard-overlay');
+        const optionsOverlay = document.getElementById('options-overlay');
+        
+        const onlineModeMenu = document.getElementById('online-mode-menu');
+        const multiplayerMenu = document.getElementById('multiplayer-menu');
+        const waitingRoomOverlay = document.getElementById('waiting-room-overlay');
+        const roomCodeDisplay = document.getElementById('room-code-display');
+
+        const backgroundMusic = new Audio('https://cdn.glitch.global/c5869455-cb23-4161-ad6a-2415d8833917/background-music.mp3?v=1678297782112');
+        backgroundMusic.loop = true;
+        backgroundMusic.volume = 0.3;
+        const lockSound = new Audio('https://cdn.glitch.global/c5869455-cb23-4161-ad6a-2415d8833917/lock-in-sound.wav?v=1678297785235');
+        lockSound.volume = 0.3;
+        
+        let gameOptions = { music: true, sfx: true };
+        let isMusicPlaying = false;
+
+        const MAX_SCORE = 5;
+        const OPPONENT_CHOICE_WINDOW = 3;
+        const PRE_ROUND_COUNTDOWN = 3;
+        const SWIPE_THRESHOLD = 50;
+        const gameSettings = {
+            easy:   { duration: 20, aiInterval: 700, aiAccuracy: 120, aiStrategy: 'threshold', decisionWindow: [16, 12], decisionChance: 0.3 },
+            medium: { duration: 15, aiInterval: 450, aiAccuracy: 65,  aiStrategy: 'threshold', decisionWindow: [11, 7],  decisionChance: 0.5 },
+            hard:   { duration: 10, aiInterval: 300, aiAccuracy: 25,  aiStrategy: 'best',      decisionWindow: [5, 2] }
+        };
+        let currentDifficulty = gameSettings.medium;
+        let playerScore = 0, cpuScore = 0;
+        let preRoundInterval, roundCountdownInterval, urgentCountdownInterval, cpuAiInterval, resultTimeoutId;
+        let timeLeftInRound = 0, urgentTimeLeft = 0;
+        let touchStartY = 0, hasSwipedInGesture = false;
+
+        let gameState = {};
+        let overlayBeforePause = null;
+        
+        let isMultiplayer = false;
+        let socket = null;
+        let roomId = null;
+        let currentGameMode = 'casual';
+        let localPlayer = { username: null, rankScore: null };
+        let opponentPlayer = { username: null, rankScore: null };
+
+        function clearAllTimers() {
+            clearInterval(preRoundInterval);
+            clearInterval(roundCountdownInterval);
+            clearInterval(urgentCountdownInterval);
+            clearInterval(cpuAiInterval);
+            if (resultTimeoutId) clearTimeout(resultTimeoutId);
+        }
+
+        function resetClientGameState() {
+            clearAllTimers();
+            isMultiplayer = false;
+            roomId = null; 
+            playerScore = 0;
+            cpuScore = 0;
+            opponentPlayer = { username: null, rankScore: null };
+            gameState = {
+                isRoundActive: false, isPaused: false, activeTimer: null, targetColor: '',
+                playerColor: '', cpuColor: '', cpuBestColorFound: '', aiDecisionTime: 0,
+                playerChoice: null, cpuChoice: null, playerLocked: false, cpuLocked: false,
+                playerReady: false, cpuReady: false, roundDuration: 15
+            };
+            document.querySelector('.game-container').appendChild(timerDisplay);
+            timerDisplay.classList.remove('urgent', 'repositioned');
+            timerDisplay.textContent = '';
+            centralDisplay.textContent = '';
+            updateScoreDisplay();
+            playerResultDisplay.style.display = 'none';
+            cpuResultDisplay.style.display = 'none';
+            playerWinnerIndicator.style.display = 'none';
+            cpuWinnerIndicator.style.display = 'none';
+        }
+
+        function playSound(sound) {
+            if (gameOptions.sfx) {
+                sound.play().catch(e => {});
+            }
+        }
+
+        function updateMusicState() {
+            if (gameOptions.music && !isMusicPlaying) {
+                backgroundMusic.play().catch(e => console.error("Autoplay blocked:", e));
+                isMusicPlaying = true;
+            } else if (!gameOptions.music && isMusicPlaying) {
+                backgroundMusic.pause();
+                isMusicPlaying = false;
+            }
+        }
+        
+        function getTier(score) {
+            if (score >= 1700) return { name: 'Diamond', icon: '✨' };
+            if (score >= 1500) return { name: 'Platinum', icon: '💎' };
+            if (score >= 1300) return { name: 'Gold', icon: '🥇' };
+            if (score >= 1100) return { name: 'Silver', icon: '🥈' };
+            return { name: 'Bronze', icon: '🥉' };
+        }
+
+        function updatePlayerInfoUI() {
+            if (isMultiplayer) {
+                const myTier = getTier(localPlayer.rankScore);
+                playerInfoDisplay.innerHTML = `<span class="tier">${myTier.icon}</span> ${localPlayer.username} <span class="score">[${localPlayer.rankScore}]</span>`;
+                if (opponentPlayer && opponentPlayer.username) {
+                    const opponentTier = getTier(opponentPlayer.rankScore);
+                    cpuInfoDisplay.innerHTML = `<span class="tier">${opponentTier.icon}</span> ${opponentPlayer.username} <span class="score">[${opponentPlayer.rankScore}]</span>`;
+                } else {
+                     cpuInfoDisplay.innerHTML = `Opponent`;
+                }
+            } else {
+                playerInfoDisplay.innerHTML = `Player`;
+                cpuInfoDisplay.innerHTML = `CPU (${currentDifficulty.name || 'Medium'})`;
+            }
+        }
+
+        function updateMainMenuProfile() {
+            if (localPlayer.username) {
+                const tier = getTier(localPlayer.rankScore);
+                playerProfileDisplay.innerHTML = `
+                    <span><strong class="tier">${tier.icon} ${localPlayer.username}</strong></span>
+                    <span style="margin: 0 10px; opacity: 0.6;">|</span> 
+                    <span>Score: ${localPlayer.rankScore}</span>
+                `;
+            }
+        }
+        
+        function connectToMultiplayer() {
+            if (!socket || !socket.connected) {
+                const authSubtitle = document.getElementById('auth-subtitle');
+                authSubtitle.textContent = "Connection required for online play. Please log in again.";
+                showOverlay(loginOverlay);
+                return;
+            }
+            socket.emit('findMatch', { playerData: localPlayer, gameMode: currentGameMode });
+            messageOverlay.querySelector('h1').textContent = `Searching for a ${currentGameMode} match...`;
+            messageOverlay.querySelector('p').textContent = `Looking for a suitable opponent...`;
+            messageButtons.innerHTML = `<button id="cancel-matchmaking-btn" class="button-tertiary">Cancel</button>`;
+            document.getElementById('cancel-matchmaking-btn').onclick = () => {
+                socket.emit('cancelFindMatch');
+                showOverlay(onlineModeMenu);
+            };
+            showOverlay(messageOverlay);
+        }
+
+        function sendGameEvent(eventName, payload) {
+            if (socket && isMultiplayer && roomId) {
+                socket.emit('gameEvent', { roomId, event: eventName, payload });
+            }
+        }
+
+        function showOverlay(overlay) {
+            [mainMenu, difficultySelection, rulesOverlay, pauseMenu, messageOverlay, loginOverlay, leaderboardOverlay, optionsOverlay, multiplayerMenu, waitingRoomOverlay, onlineModeMenu].forEach(o => o.classList.add('hidden'));
+            if (overlay) overlay.classList.remove('hidden');
+        }
+
+        function showMainMenu() {
+            resetClientGameState(); 
+            pauseButton.style.display = 'none';
+            playerInfoDisplay.innerHTML = '';
+            cpuInfoDisplay.innerHTML = '';
+            showOverlay(mainMenu);
+        }
+
+        function abandonGame() {
+            if (isMultiplayer && socket && socket.connected && roomId) {
+                socket.emit('leaveGame', { roomId: roomId });
+            }
+            showMainMenu();
+        }
+
+        function leavePostGameLobby() {
+            if (isMultiplayer && socket && socket.connected && roomId) {
+                socket.emit('leavePostGameLobby', { roomId: roomId });
+            }
+            showMainMenu();
+        }
+
+        function requestRematch() {
+            if (isMultiplayer && socket && socket.connected) {
+                socket.emit('requestRematch', { roomId: roomId });
+                messageOverlay.querySelector('h1').textContent = 'Waiting...';
+                messageOverlay.querySelector('p').textContent = 'Waiting for the opponent\'s decision.';
+                messageButtons.innerHTML = '';
+                showOverlay(messageOverlay);
+            }
+        }
+        
+        function startGame() {
+            clearAllTimers();
+            playerScore = 0;
+            cpuScore = 0;
+            isMultiplayer = !!(opponentPlayer && opponentPlayer.username); 
+            updateScoreDisplay();
+            showReadyScreen("The first round begins!");
+        }
+
+        function startRound() {
+            clearAllTimers();
+            cpuObfuscationOverlay.style.display = 'block';
+            timerDisplay.classList.remove('urgent');
+            
+            gameState.isRoundActive = true;
+            gameState.isPaused = false;
+            gameState.playerChoice = null;
+            gameState.cpuChoice = null;
+            gameState.playerLocked = false;
+            gameState.cpuLocked = false;
+            
+            timeLeftInRound = isMultiplayer ? gameState.roundDuration : currentDifficulty.duration;
+
+            timerDisplay.textContent = timeLeftInRound;
+
+            if (!isMultiplayer) { 
+                gameState.targetColor = getRandomColor();
+                targetSquare.style.backgroundColor = gameState.targetColor;
+                gameState.playerColor = getRandomColor();
+                playerArea.style.backgroundColor = gameState.playerColor;
+                gameState.cpuColor = getRandomColor();
+                gameState.cpuBestColorFound = gameState.cpuColor; 
+                cpuArea.style.backgroundColor = gameState.cpuColor;
+                startCpuAI();
+            }
+            startRoundTimer(timeLeftInRound);
+        }
+        
+        function endRound() {
+            if (!gameState.isRoundActive) return;
+            clearAllTimers();
+            gameState.isRoundActive = false;
+            timerDisplay.textContent = '';
+            messageOverlay.querySelector('h1').textContent = "Calculating Result...";
+            messageOverlay.querySelector('p').textContent = "";
+            messageButtons.innerHTML = '';
+            showOverlay(messageOverlay);
+            setTimeout(() => {
+                showOverlay(null);
+                showResultScreen();
+            }, 2000);
+        }
+
+        function showResultScreen() {
+            cpuObfuscationOverlay.style.display = 'none';
+            playerFeedbackMessage.classList.remove('visible');
+            cpuFeedbackMessage.classList.remove('visible');
+            if (!gameState.playerLocked) gameState.playerChoice = gameState.playerColor;
+            if (!gameState.cpuLocked) {
+                const opponentColor = isMultiplayer ? gameState.cpuColor : gameState.cpuBestColorFound;
+                gameState.cpuChoice = opponentColor || gameState.cpuColor;
+            }
+            const playerDiff = getColorDifference(gameState.playerChoice, gameState.targetColor);
+            const cpuDiff = getColorDifference(gameState.cpuChoice, gameState.targetColor);
+            playerResultScore.textContent = playerDiff.toFixed(2);
+            cpuResultScore.textContent = cpuDiff.toFixed(2);
+            playerResultDisplay.style.display = 'flex';
+            cpuResultDisplay.style.display = 'flex';
+            centralDisplay.classList.remove('countdown');
+            centralDisplay.classList.add('hex-code');
+            centralDisplay.textContent = gameState.targetColor.toUpperCase();
+            let roundWinnerMessage;
+            if (playerDiff < cpuDiff) {
+                playerScore++;
+                roundWinnerMessage = "You won the round!";
+                playerWinnerIndicator.style.display = 'block';
+            } else if (cpuDiff < playerDiff) {
+                cpuScore++;
+                const opponentName = isMultiplayer ? opponentPlayer.username : "The CPU";
+                roundWinnerMessage = `${opponentName} won the round.`;
+                cpuWinnerIndicator.style.display = 'block';
+            } else {
+                roundWinnerMessage = "It's a draw!";
+            }
+            
+            resultTimeoutId = setTimeout(() => {
+                playerResultDisplay.style.display = 'none';
+                cpuResultDisplay.style.display = 'none';
+                playerWinnerIndicator.style.display = 'none';
+                cpuWinnerIndicator.style.display = 'none';
+                centralDisplay.textContent = '';
+                centralDisplay.classList.remove('hex-code');
+                updateScoreDisplay();
+                if (playerScore >= MAX_SCORE || cpuScore >= MAX_SCORE) {
+                    endGame();
+                } else {
+                    showReadyScreen(roundWinnerMessage);
+                }
+            }, 4000);
+        }
+        
+        function endGame() {
+            let winnerMessage;
+            if (playerScore >= MAX_SCORE) {
+                 winnerMessage = 'You Won!';
+                 if (isMultiplayer) {
+                    socket.emit('gameOver', { winnerUsername: localPlayer.username, loserUsername: opponentPlayer.username, roomId: roomId });
+                 }
+            } else {
+                const opponentName = isMultiplayer ? opponentPlayer.username : 'the CPU';
+                winnerMessage = `Defeat! ${opponentName} won`;
+            }
+            messageOverlay.querySelector('h1').textContent = winnerMessage;
+            messageOverlay.querySelector('p').textContent = `Final score: ${playerScore} - ${cpuScore}`;
+            
+            if (isMultiplayer) {
+                messageButtons.innerHTML = `<button id="play-again-btn" class="button-primary">Play Again</button><button id="main-menu-btn" class="button-tertiary">Main Menu</button>`;
+                document.getElementById('play-again-btn').onclick = requestRematch;
+                document.getElementById('main-menu-btn').onclick = leavePostGameLobby;
+            } else {
+                messageButtons.innerHTML = `<button id="play-again-btn" class="button-primary">Play Again</button><button id="main-menu-btn" class="button-tertiary">Main Menu</button>`;
+                document.getElementById('play-again-btn').onclick = () => showOverlay(difficultySelection);
+                document.getElementById('main-menu-btn').onclick = showMainMenu;
+            }
+
+            showOverlay(messageOverlay);
+        }
+
+        function updateScoreDisplay() {
+            const scoreContainers = [document.getElementById('player-score-container'), document.getElementById('cpu-score-container')];
+            const scores = [playerScore, cpuScore];
+            scoreContainers.forEach((container, index) => {
+                container.innerHTML = '';
+                for (let i = 0; i < MAX_SCORE; i++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'score-dot';
+                    if (i < scores[index]) dot.classList.add('filled');
+                    container.appendChild(dot);
+                }
+            });
+        }
+        
+        function handlePlayerSelection(who) {
+            if (!gameState.isRoundActive || (who === 'player' && gameState.playerLocked) || (who === 'cpu' && gameState.cpuLocked)) {
+                return;
+            }
+            playSound(lockSound);
+            if (who === 'player') {
+                gameState.playerChoice = gameState.playerColor;
+                gameState.playerLocked = true;
+                playerFeedbackMessage.classList.add('visible');
+                sendGameEvent('playerLocked', {});
+            } else {
+                gameState.cpuChoice = gameState.cpuColor; 
+                gameState.cpuLocked = true;
+                cpuFeedbackMessage.classList.add('visible');
+            }
+            if (gameState.playerLocked && gameState.cpuLocked) {
+                clearAllTimers();
+                setTimeout(endRound, 1500);
+            } else {
+                clearAllTimers();
+                timerDisplay.classList.add('urgent', 'repositioned');
+                if (who === 'player') {
+                    cpuArea.appendChild(timerDisplay);
+                } else {
+                    playerArea.appendChild(timerDisplay);
+                }
+                urgentTimeLeft = Math.min(timeLeftInRound, OPPONENT_CHOICE_WINDOW);
+                timerDisplay.textContent = urgentTimeLeft;
+                startUrgentTimer(urgentTimeLeft);
+            }
+        }
+
+        function showReadyScreen(message) {
+            gameState.playerReady = false;
+            gameState.cpuReady = false;
+            
+            messageOverlay.querySelector('h1').textContent = message;
+            messageOverlay.querySelector('p').textContent = "Waiting for players...";
+            messageButtons.innerHTML = `<button id="ready-btn" class="button-primary">Ready</button>`;
+            const readyBtn = document.getElementById('ready-btn');
+            readyBtn.onclick = () => {
+                gameState.playerReady = true;
+                readyBtn.disabled = true;
+                readyBtn.textContent = 'Waiting...';
+                if (isMultiplayer) {
+                    sendGameEvent('playerReady', {});
+                }
+                checkReadyState();
+            };
+            showOverlay(messageOverlay);
+            if (!isMultiplayer) {
+                setTimeout(() => {
+                    gameState.cpuReady = true;
+                    checkReadyState();
+                }, Math.random() * 1500 + 1000);
+            }
+        }
+
+        function checkReadyState() {
+            if (gameState.playerReady && gameState.cpuReady) {
+                if (!isMultiplayer) {
+                    showOverlay(null); 
+                    startPreRoundCountdown();
+                }
+            } else if (gameState.playerReady) {
+                 const opponentName = isMultiplayer ? "opponent..." : "CPU...";
+                 messageOverlay.querySelector('p').textContent = `Waiting for ${opponentName}`;
+            } else if (gameState.cpuReady) {
+                 const opponentName = isMultiplayer ? "Opponent is ready" : "CPU is ready";
+                 messageOverlay.querySelector('p').textContent = `${opponentName}. Waiting for you...`;
+            }
+        }
+
+        function startPreRoundCountdown() {
+            clearAllTimers();
+            document.querySelector('.game-container').appendChild(timerDisplay);
+            timerDisplay.classList.remove('urgent', 'repositioned');
+            let count = PRE_ROUND_COUNTDOWN;
+            timerDisplay.style.display = 'none';
+            if (!isMultiplayer) {
+                targetSquare.style.backgroundColor = '#fff';
+            }
+            centralDisplay.classList.remove('hex-code');
+            centralDisplay.classList.add('countdown');
+            centralDisplay.textContent = count;
+            playerFeedbackMessage.classList.remove('visible');
+            cpuFeedbackMessage.classList.remove('visible');
+            preRoundInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    centralDisplay.textContent = count;
+                } else {
+                    clearInterval(preRoundInterval);
+                    centralDisplay.textContent = '';
+                    timerDisplay.style.display = 'block';
+                    showGoMessage();
+                    setTimeout(startRound, 500);
+                }
+            }, 1000);
+        }
+
+        function showGoMessage() {
+            goMessage.classList.add('show');
+            setTimeout(() => goMessage.classList.remove('show'), 500);
+        }
+
+        function startRoundTimer(duration) {
+            clearInterval(roundCountdownInterval);
+            gameState.activeTimer = 'round';
+            timeLeftInRound = duration;
+            timerDisplay.textContent = timeLeftInRound;
+            roundCountdownInterval = setInterval(() => {
+                if (gameState.isPaused) return;
+                timeLeftInRound--;
+                timerDisplay.textContent = timeLeftInRound;
+                if (timeLeftInRound <= 0) {
+                     endRound();
+                }
+            }, 1000);
+        }
+
+        function startUrgentTimer(duration) {
+            clearInterval(urgentCountdownInterval);
+            gameState.activeTimer = 'urgent';
+            urgentTimeLeft = duration;
+            timerDisplay.textContent = urgentTimeLeft;
+            urgentCountdownInterval = setInterval(() => {
+                if (gameState.isPaused) return;
+                urgentTimeLeft--;
+                timerDisplay.textContent = urgentTimeLeft;
+                if (urgentTimeLeft <= 0) {
+                    endRound();
+                }
+            }, 1000);
+        }
+        
+        function pauseGame() {
+            const overlays = [mainMenu, difficultySelection, rulesOverlay, messageOverlay, loginOverlay, leaderboardOverlay, optionsOverlay, onlineModeMenu, multiplayerMenu, waitingRoomOverlay];
+            overlayBeforePause = overlays.find(o => !o.classList.contains('hidden')) || null;
+            
+            if (gameState.isRoundActive && !isMultiplayer) {
+                gameState.isPaused = true;
+            }
+            
+            showOverlay(pauseMenu);
+        }
+
+        function resumeGame() {
+            const restoreOverlay = overlayBeforePause;
+            overlayBeforePause = null; 
+            
+            showOverlay(restoreOverlay);
+
+            if (gameState.isPaused && !isMultiplayer) {
+                gameState.isPaused = false;
+            }
+        }
+
+        function changePlayerColor() {
+            if (!gameState.isRoundActive || gameState.playerLocked) return;
+            
+            if (Math.random() < 0.3) {
+                gameState.playerColor = getSimilarColor(gameState.targetColor);
+            } else {
+                gameState.playerColor = getRandomColor();
+            }
+            
+            playerArea.style.backgroundColor = gameState.playerColor;
+            
+            if (isMultiplayer) {
+                sendGameEvent('playerColorChanged', { color: gameState.playerColor });
+            }
+        }
+        
+        function startCpuAI() {
+            if (cpuAiInterval) clearInterval(cpuAiInterval);
+            let minDiff = Infinity;
+            const [maxTime, minTime] = currentDifficulty.decisionWindow;
+            gameState.aiDecisionTime = Math.floor(Math.random() * (maxTime - minTime + 1)) + minTime;
+            cpuAiInterval = setInterval(() => {
+                if (!gameState.isRoundActive || gameState.cpuLocked || gameState.isPaused) return;
+
+                const newColor = (Math.random() > 0.3) ? getSimilarColor(gameState.targetColor) : getRandomColor();
+                const currentDiff = getColorDifference(newColor, gameState.targetColor);
+                if (currentDifficulty.aiStrategy === 'best') {
+                    if (currentDiff < minDiff) {
+                        minDiff = currentDiff;
+                        gameState.cpuBestColorFound = newColor;
+                        cpuArea.style.backgroundColor = gameState.cpuBestColorFound;
+                    }
+                    if (timeLeftInRound <= gameState.aiDecisionTime && gameState.activeTimer === 'round') {
+                        gameState.cpuColor = gameState.cpuBestColorFound;
+                        handlePlayerSelection('cpu');
+                    }
+                } else {
+                    cpuArea.style.backgroundColor = newColor;
+                    gameState.cpuBestColorFound = newColor; 
+                    if (timeLeftInRound <= gameState.aiDecisionTime && Math.random() < currentDifficulty.decisionChance) {
+                        if (currentDiff < currentDifficulty.aiAccuracy) {
+                            gameState.cpuColor = newColor;
+                            handlePlayerSelection('cpu');
+                        }
+                    }
+                }
+            }, currentDifficulty.aiInterval);
+        }
+        
+        function getRandomColor() { return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'); }
+        function getSimilarColor(hexColor) { let [r, g, b] = hexToRgb(hexColor); const v = 40; r = Math.max(0, Math.min(255, r + Math.floor((Math.random() - 0.5) * v))); g = Math.max(0, Math.min(255, g + Math.floor((Math.random() - 0.5) * v))); b = Math.max(0, Math.min(255, b + Math.floor((Math.random() - 0.5) * v))); return rgbToHex(r, g, b); }
+        function hexToRgb(hex) { const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : null; }
+        function rgbToHex(r, g, b) { return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).padStart(6, '0'); }
+        function getColorDifference(hex1, hex2) { if (!hex1 || !hex2) return Infinity; const [r1, g1, b1] = hexToRgb(hex1); const [r2, g2, b2] = hexToRgb(hex2); return Math.sqrt(Math.pow(r1 - r2, 2) + Math.pow(g1 - g2, 2) + Math.pow(b1 - b2, 2)); }
+        
+        function setupSocketListeners() {
+            if (!socket) return;
+            
+            const authErrorEl = document.getElementById('auth-error');
+
+            socket.on('loginSuccess', (playerData) => {
+                localPlayer = playerData;
+                localStorage.setItem('playerData', JSON.stringify(playerData));
+                updateMainMenuProfile();
+                showOverlay(mainMenu);
+            });
+            
+            socket.on('forceLogin', () => {
+                localStorage.removeItem('playerData');
+                localPlayer = { username: null, rankScore: null };
+                showOverlay(loginOverlay);
+            });
+
+            socket.on('registerSuccess', (playerData) => {
+                localPlayer = playerData;
+                localStorage.setItem('playerData', JSON.stringify(playerData));
+                updateMainMenuProfile();
+                showOverlay(mainMenu);
+            });
+
+            socket.on('loginError', (errorMsg) => {
+                authErrorEl.textContent = errorMsg;
+                authErrorEl.style.display = 'block';
+            });
+            
+            socket.on('registerError', (errorMsg) => {
+                authErrorEl.textContent = errorMsg;
+                authErrorEl.style.display = 'block';
+            });
+
+            socket.on('gameReady', (data) => {
+                roomId = data.roomId;
+                isMultiplayer = true;
+                opponentPlayer = data.players.find(p => p.username !== localPlayer.username);
+                showOverlay(null);
+                updatePlayerInfoUI();
+                startGame();
+            });
+
+            socket.on('leaderboardData', (data) => {
+                const leaderboardBody = document.getElementById('leaderboard-body');
+                leaderboardBody.innerHTML = '';
+                data.sort((a, b) => a.rank - b.rank).forEach(player => {
+                    const tier = getTier(player.rankScore);
+                    const row = document.createElement('tr');
+                    if (player.isCurrentUser) {
+                        row.id = 'current-user-rank';
+                    }
+                    row.innerHTML = `<td>${player.rank}</td><td>${tier.icon} ${player.username}</td><td>${player.rankScore}</td>`;
+                    leaderboardBody.appendChild(row);
+                });
+                showOverlay(leaderboardOverlay);
+            });
+
+            socket.on('updateRankScore', ({ newRankScore }) => {
+                localPlayer.rankScore = newRankScore;
+                localStorage.setItem('playerData', JSON.stringify(localPlayer));
+                updateMainMenuProfile();
+            });
+
+            socket.on('opponentLeftRematch', () => {
+                messageOverlay.querySelector('h1').textContent = 'Rematch Cancelled';
+                messageOverlay.querySelector('p').textContent = 'The opponent has left the game.';
+                messageButtons.innerHTML = `<button onclick="showMainMenu()" class="button-primary">Back to Menu</button>`;
+                showOverlay(messageOverlay);
+            });
+
+            socket.on('opponentDisconnected', () => {
+                clearAllTimers();
+                messageOverlay.querySelector('h1').textContent = 'Victory!';
+                messageOverlay.querySelector('p').textContent = 'Your opponent has disconnected.';
+                messageButtons.innerHTML = `<button onclick="showMainMenu()" class="button-primary">Back to Menu</button>`;
+                showOverlay(messageOverlay);
+            });
+            
+            socket.on('privateRoomCreated', ({ code }) => {
+                roomCodeDisplay.textContent = code;
+                showOverlay(waitingRoomOverlay);
+            });
+
+            socket.on('joinRoomError', (errorMsg) => {
+                messageOverlay.querySelector('h1').textContent = 'Error';
+                messageOverlay.querySelector('p').textContent = errorMsg;
+                messageButtons.innerHTML = `<button onclick="showOverlay(multiplayerMenu)" class="button-primary">OK</button>`;
+                showOverlay(messageOverlay);
+            });
+
+            socket.on('gameEvent', (data) => {
+                if (!roomId || data.roomId !== roomId) return;
+
+                switch(data.event) {
+                    case 'playerColorChanged': gameState.cpuColor = data.payload.color; cpuArea.style.backgroundColor = gameState.cpuColor; break;
+                    case 'playerLocked': handlePlayerSelection('cpu'); break;
+                    case 'playerReady':
+                        gameState.cpuReady = true;
+                        checkReadyState();
+                        break;
+                    case 'roundStartData':
+                        if (data.payload.players) {
+                            opponentPlayer = data.payload.players.find(p => p.username !== localPlayer.username);
+                        }
+                        gameState.roundDuration = data.payload.duration;
+                        updateScoreDisplay();
+                        updatePlayerInfoUI();
+                        gameState.targetColor = data.payload.targetColor;
+                        targetSquare.style.backgroundColor = gameState.targetColor;
+                        const myColor = data.payload.initialColors[socket.id];
+                        const opponentId = Object.keys(data.payload.initialColors).find(id => id !== socket.id);
+                        const opponentColor = data.payload.initialColors[opponentId];
+                        gameState.playerColor = myColor;
+                        gameState.cpuColor = opponentColor;
+                        playerArea.style.backgroundColor = gameState.playerColor;
+                        cpuArea.style.backgroundColor = gameState.cpuColor;
+                        showOverlay(null);
+                        startPreRoundCountdown();
+                        break;
+                }
+            });
+        }
+        
+        function handleTouchStart(e) {
+            e.preventDefault();
+            if (!gameState.isRoundActive || gameState.playerLocked || gameState.isPaused) return;
+            hasSwipedInGesture = false;
+            touchStartY = e.touches ? e.touches[0].clientY : e.clientY;
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            if (hasSwipedInGesture || !gameState.isRoundActive || gameState.playerLocked || gameState.isPaused) return;
+            const currentY = e.touches ? e.touches[0].clientY : e.clientY;
+            if (Math.abs(currentY - touchStartY) > SWIPE_THRESHOLD) {
+                changePlayerColor();
+                hasSwipedInGesture = true;
+            }
+        }
+
+        function initializeApp() {
+            const savedOptions = localStorage.getItem('gameOptions');
+            if (savedOptions) {
+                gameOptions = JSON.parse(savedOptions);
+            }
+            
+            const savedDataString = localStorage.getItem('playerData');
+            if (savedDataString) {
+                const savedData = JSON.parse(savedDataString);
+                localPlayer = savedData;
+                socket = io('https://color-swipe-server.onrender.com');
+                setupSocketListeners();
+                socket.on('connect', () => {
+                    socket.emit('rejoinWithUsername', { username: localPlayer.username });
+                });
+            } else {
+                showOverlay(loginOverlay);
+            }
+            
+            resetClientGameState();
+
+            let isRegisterMode = false;
+            const usernameInput = document.getElementById('username-input');
+            const passwordInput = document.getElementById('password-input');
+            const authBtn = document.getElementById('auth-btn');
+            const authToggle = document.getElementById('auth-toggle');
+            const authTitle = document.getElementById('auth-title');
+            const authSubtitle = document.getElementById('auth-subtitle');
+            const authError = document.getElementById('auth-error');
+
+            authToggle.onclick = () => {
+                isRegisterMode = !isRegisterMode;
+                authTitle.textContent = isRegisterMode ? 'Register' : 'Login';
+                authSubtitle.textContent = isRegisterMode ? 'Create a new account to play.' : 'Enter your credentials to play online.';
+                authBtn.textContent = isRegisterMode ? 'Register' : 'Enter';
+                authToggle.textContent = isRegisterMode ? 'Already have an account? Login' : 'Don\'t have an account? Register';
+                authError.style.display = 'none';
+            };
+
+            const handleAuthAction = () => {
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value.trim();
+                authError.style.display = 'none';
+
+                if (!socket || !socket.connected) {
+                    socket = io('https://color-swipe-server.onrender.com');
+                    setupSocketListeners();
+                }
+
+                const action = () => {
+                    if (isRegisterMode) {
+                        socket.emit('register', { username, password });
+                    } else {
+                        socket.emit('login', { username, password });
+                    }
+                };
+
+                if (socket.connected) { action(); } 
+                else { socket.once('connect', action); }
+            };
+            
+            authBtn.onclick = handleAuthAction;
+            passwordInput.onkeydown = (e) => { if (e.key === 'Enter') handleAuthAction(); };
+            
+            document.getElementById('play-vs-cpu-btn').onclick = () => {
+                updateMusicState();
+                pauseButton.style.display = 'flex';
+                isMultiplayer = false;
+                showOverlay(difficultySelection);
+            };
+            
+            document.getElementById('play-vs-player-btn').onclick = () => {
+                showOverlay(onlineModeMenu);
+            };
+            
+            document.getElementById('casual-mode-btn').onclick = () => {
+                currentGameMode = 'casual';
+                document.getElementById('multiplayer-title').textContent = 'Casual Mode';
+                showOverlay(multiplayerMenu);
+            };
+            
+            document.getElementById('ranked-mode-btn').onclick = () => {
+                currentGameMode = 'ranked';
+                document.getElementById('multiplayer-title').textContent = 'Ranked Mode';
+                showOverlay(multiplayerMenu);
+            };
+            
+            document.getElementById('back-to-main-from-online-btn').onclick = () => showOverlay(mainMenu);
+            document.getElementById('back-to-online-mode-btn').onclick = () => showOverlay(onlineModeMenu);
+
+            document.getElementById('random-match-btn').onclick = () => {
+                 updateMusicState();
+                 pauseButton.style.display = 'flex';
+                 connectToMultiplayer();
+            };
+            
+            document.getElementById('create-room-btn').onclick = () => {
+                updateMusicState();
+                pauseButton.style.display = 'flex';
+                socket.emit('createPrivateRoom', { playerData: localPlayer, gameMode: currentGameMode });
+            };
+            
+            document.getElementById('join-room-btn').onclick = () => {
+                messageOverlay.querySelector('h1').textContent = 'Join a Room';
+                messageOverlay.querySelector('p').textContent = 'Enter the room code to join:';
+                messageButtons.innerHTML = `
+                    <input type="text" id="room-code-input" class="overlay-input" placeholder="CODE" maxlength="5" style="text-transform:uppercase">
+                    <button id="join-room-submit-btn" class="button-primary">Join</button>
+                    <button id="back-from-join-btn" class="button-tertiary">Back</button>`;
+
+                const codeInput = document.getElementById('room-code-input');
+                document.getElementById('join-room-submit-btn').onclick = () => {
+                    const code = codeInput.value.trim().toUpperCase();
+                    if (code) {
+                        updateMusicState();
+                        pauseButton.style.display = 'flex';
+                        socket.emit('joinPrivateRoom', { code: code, playerData: localPlayer });
+                    }
+                };
+                 document.getElementById('back-from-join-btn').onclick = () => showOverlay(multiplayerMenu);
+                 showOverlay(messageOverlay);
+            };
+            
+            roomCodeDisplay.onclick = () => {
+                navigator.clipboard.writeText(roomCodeDisplay.textContent)
+                    .then(() => alert('Code copied!'))
+                    .catch(err => console.error('Error copying code:', err));
+            };
+
+            // --- BLOCCO DI CODICE AGGIUNTO ---
+            // Gestisce il click sul nuovo pulsante "Condividi Codice"
+            document.getElementById('share-room-code-btn').onclick = async () => {
+                const code = roomCodeDisplay.textContent;
+                const shareData = {
+                    title: 'Color Swipe Duel',
+                    text: `Join my match on Color Swipe Duel! The code is: ${code}`,
+                    // Se vuoi, puoi aggiungere qui il link pubblico al tuo gioco Netlify
+                    // url: 'https://tuo-gioco.netlify.app' 
+                };
+                
+                try {
+                    // Controlla se il browser supporta l'API di condivisione nativa (funziona su mobile)
+                    if (navigator.share) {
+                        await navigator.share(shareData);
+                        console.log('Code shared successfully!');
+                    } else {
+                        // Altrimenti, esegue il fallback (copia negli appunti), utile per i computer desktop
+                        navigator.clipboard.writeText(code)
+                            .then(() => alert('Code copied to clipboard! Paste it into your friend\'s chat.'))
+                            .catch(err => console.error('Error copying code:', err));
+                    }
+                } catch (err) {
+                    console.error('Error sharing:', err);
+                }
+            };
+            // --- FINE BLOCCO DI CODICE AGGIUNTO ---
+
+            document.getElementById('cancel-private-room-btn').onclick = () => {
+                socket.emit('cancelPrivateRoom');
+                showOverlay(multiplayerMenu);
+            };
+
+            document.getElementById('rules-btn').onclick = () => showOverlay(rulesOverlay);
+            document.getElementById('close-rules-btn').onclick = () => showOverlay(mainMenu);
+            
+            document.getElementById('leaderboard-btn').onclick = () => {
+                if(!socket || !socket.connected) {
+                    const authSubtitle = document.getElementById('auth-subtitle');
+                    authSubtitle.textContent = "Connection required to view the leaderboard. Please log in.";
+                    showOverlay(loginOverlay);
+                    return;
+                }
+                socket.emit('getLeaderboard', { username: localPlayer.username });
+            };
+            document.getElementById('close-leaderboard-btn').onclick = () => showOverlay(mainMenu);
+            document.getElementById('my-position-btn').onclick = () => {
+                const myRankRow = document.getElementById('current-user-rank');
+                if (myRankRow) {
+                    myRankRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            };
+            
+            const toggleMusicBtn = document.getElementById('toggle-music-btn');
+            const toggleSfxBtn = document.getElementById('toggle-sfx-btn');
+
+            function updateOptionsUI() {
+                toggleMusicBtn.textContent = gameOptions.music ? 'ON' : 'OFF';
+                toggleMusicBtn.className = `toggle-btn ${gameOptions.music ? 'on' : 'off'}`;
+                toggleSfxBtn.textContent = gameOptions.sfx ? 'ON' : 'OFF';
+                toggleSfxBtn.className = `toggle-btn ${gameOptions.sfx ? 'on' : 'off'}`;
+            }
+            
+            document.getElementById('options-btn').onclick = () => {
+                updateOptionsUI();
+                showOverlay(optionsOverlay);
+            };
+            document.getElementById('close-options-btn').onclick = () => showOverlay(mainMenu);
+
+            toggleMusicBtn.onclick = () => {
+                gameOptions.music = !gameOptions.music;
+                localStorage.setItem('gameOptions', JSON.stringify(gameOptions));
+                updateOptionsUI();
+                updateMusicState();
+            };
+            toggleSfxBtn.onclick = () => {
+                gameOptions.sfx = !gameOptions.sfx;
+                localStorage.setItem('gameOptions', JSON.stringify(gameOptions));
+                updateOptionsUI();
+            };
+
+            playerArea.addEventListener('touchstart', handleTouchStart, { passive: false });
+            playerArea.addEventListener('touchmove', handleTouchMove, { passive: false });
+            playerArea.addEventListener('mousedown', handleTouchStart, { passive: false });
+            playerArea.addEventListener('mousemove', handleTouchMove, { passive: false });
+            
+            targetSquare.addEventListener('click', () => handlePlayerSelection('player'));
+            targetSquare.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                handlePlayerSelection('player');
+            });
+            
+            document.querySelectorAll('.difficulty-btn').forEach(button => {
+                button.onclick = (e) => {
+                    const level = e.target.dataset.difficulty;
+                    currentDifficulty = { ...gameSettings[level], name: level.charAt(0).toUpperCase() + level.slice(1) };
+                    showOverlay(null);
+                    updatePlayerInfoUI();
+                    startGame();
+                };
+            });
+
+            pauseButton.onclick = pauseGame;
+            document.getElementById('resume-btn').onclick = resumeGame;
+            document.getElementById('abandon-btn').onclick = abandonGame;
+
+            updateOptionsUI();
+        }
+        
+        window.onload = initializeApp;
+    </script>
+</body>
+</html>
