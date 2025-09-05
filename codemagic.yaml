@@ -1,7 +1,11 @@
-# Versione finale con il comando 'use-profiles' ripristinato
+# Versione definitiva con l'attivazione dell'integrazione App Store Connect
 workflows:
   capacitor-ios-app-store:
     name: Capacitor iOS App Store Build
+    # --- BLOCCO AGGIUNTO ---
+    integrations:
+      app_store_connect: Codemagic # Nome di default per l'integrazione
+    # --- FINE BLOCCO AGGIUNTO ---
     instance_type: mac_mini_m2
     environment:
       groups:
@@ -22,12 +26,12 @@ workflows:
         script: | 
           npx cap add ios
           npx cap sync ios
-      # --- LO SCRIPT PROBLEMATICO È STATO RIMOSSO, MA QUELLO SUCCESSIVO VA CORRETTO ---
+      - name: Set up code signing
+        script: | 
+          app-store-connect fetch-signing-files "$APP_ID" --type IOS_APP_STORE --create
       - name: Build and archive iOS app
         script: | 
-          # --- RIGA MANCANTE REINSERITA ---
           xcode-project use-profiles
-          # --- FINE RIGA REINSERITA ---
           xcode-project build-ipa --workspace "ios/App/$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
