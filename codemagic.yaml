@@ -1,12 +1,16 @@
+# Versione aggiornata e più robusta del file di configurazione
 workflows:
   capacitor-ios-app-store:
     name: Capacitor iOS App Store Build
     instance_type: mac_mini_m2
     environment:
       groups:
-        - app_store_credentials 
+        - app_store_credentials
       vars:
-        APP_ID: "com.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE
+        APP_ID: "com.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE ESATTO
+        XCODE_WORKSPACE: "App.xcworkspace"
+        XCODE_SCHEME: "App"
+      node: 18 # Specifica una versione stabile di Node.js
     scripts:
       - name: Install npm dependencies
         script: | 
@@ -24,13 +28,11 @@ workflows:
       - name: Build and archive iOS app
         script: | 
           xcode-project use-profiles
-          xcode-project build-ipa --workspace "ios/App/App.xcworkspace" --scheme "App"
+          xcode-project build-ipa --workspace "ios/App/$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
-    # --- BLOCCO MODIFICATO: Usa i nomi corretti delle variabili ---
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-    # --- FINE BLOCCO MODIFICATO ---
