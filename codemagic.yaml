@@ -1,4 +1,3 @@
-# Versione finale senza il blocco 'integrations'
 workflows:
   capacitor-ios-app-store:
     name: Capacitor iOS App Store Build
@@ -7,11 +6,32 @@ workflows:
       groups:
         - apple_credentials
       vars:
-        APP_ID: "com.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE ESATTO
+        APP_ID: "com.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE
         XCODE_WORKSPACE: "App.xcworkspace"
         XCODE_SCHEME: "App"
       node: 20
     scripts:
+      - name: Decode and install signing files
+        script: | 
+          set -ex
+          
+          echo $APPLE_CERTIFICATE_BASE64 | base64 --decode > /tmp/distribution.cer
+          echo $PROVISIONING_PROFILE_BASE64 | base64 --decode > /tmp/profile.mobileprovision
+          echo $PRIVATE_KEY_BASE64 | base64 --decode > /tmp/private.key
+          
+          KEYCHAIN_PATH=$HOME/Library/Keychains/build.keychain-db
+          KEYCHAIN_PASSWORD="codemagic_temporary_password"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          security import /tmp/private.key -k $KEYCHAIN_PATH -P "$CERTIFICATE_PRIVATE_KEY_PASSWORD" -A
+          security import /tmp/distribution.cer -k $KEYCHAIN_PATH -A
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp /tmp/profile.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/"
       - name: Install npm dependencies
         script: | 
           npm install
@@ -22,9 +42,6 @@ workflows:
         script: | 
           npx cap add ios
           npx cap sync ios
-      - name: Set up code signing
-        script: | 
-          app-store-connect fetch-signing-files "$APP_ID" --type IOS_APP_STORE --create
       - name: Build and archive iOS app
         script: | 
           xcode-project use-profiles
