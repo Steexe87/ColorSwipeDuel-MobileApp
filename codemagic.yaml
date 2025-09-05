@@ -1,9 +1,7 @@
-# Versione consolidata con tutte le correzioni
+# Versione finale senza il blocco 'integrations'
 workflows:
   capacitor-ios-app-store:
     name: Capacitor iOS App Store Build
-    integrations:
-      app_store_connect: app_store_credentials
     instance_type: mac_mini_m2
     environment:
       groups:
