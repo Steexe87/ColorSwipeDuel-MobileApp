@@ -5,7 +5,7 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       groups:
-        - app_store_credentials
+        - app_credentials
       vars:
         APP_ID: "com.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE ESATTO
         XCODE_WORKSPACE: "App.xcworkspace"
