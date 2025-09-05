@@ -14,12 +14,10 @@ workflows:
       - name: Set execute permissions for Capacitor CLI
         script: | 
           chmod +x ./node_modules/.bin/cap
-      # --- BLOCCO MODIFICATO: Aggiunge la piattaforma prima di sincronizzare ---
       - name: Add and Sync Capacitor iOS platform
         script: | 
           npx cap add ios
           npx cap sync ios
-      # --- FINE BLOCCO MODIFICATO ---
       - name: Set up code signing
         script: | 
           app-store-connect fetch-signing-files "$APP_ID" --type IOS_APP_STORE --create
@@ -29,8 +27,10 @@ workflows:
           xcode-project build-ipa --workspace "ios/App/App.xcworkspace" --scheme "App"
     artifacts:
       - build/ios/ipa/*.ipa
+    # --- BLOCCO MODIFICATO: Usa i nomi corretti delle variabili ---
     publishing:
       app_store_connect:
-        api_key: $APP_STORE_CONNECT_API_KEY
-        key_id: $APP_STORE_CONNECT_KEY_ID
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+    # --- FINE BLOCCO MODIFICATO ---
