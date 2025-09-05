@@ -1,17 +1,19 @@
+# Versione finale con la creazione manuale del keychain
 workflows:
   capacitor-ios-app-store:
     name: Capacitor iOS App Store Build
     instance_type: mac_mini_m2
     environment:
       groups:
-        - apple_credentials  # Usa il nuovo gruppo di variabili
+        - apple_credentials
       vars:
-        APP_ID: "com.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE
+        APP_ID: "com.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE ESATTO
         XCODE_WORKSPACE: "App.xcworkspace"
         XCODE_SCHEME: "App"
       node: 20
     scripts:
-      - name: Decode signing files
+      # --- BLOCCO SCRIPT COMPLETAMENTE RISCRITTO ---
+      - name: Decode and install signing files
         script: | 
           set -ex # Fail on any error and print commands
           
@@ -20,19 +22,24 @@ workflows:
           echo $PROVISIONING_PROFILE_BASE64 | base64 --decode > /tmp/profile.mobileprovision
           echo $PRIVATE_KEY_BASE64 | base64 --decode > /tmp/private.key
           
-          # Crea un portachiavi (keychain) temporaneo e sicuro
-          KEYCHAIN_PATH=$CM_KEYCHAIN_PATH
-          security create-keychain -p $CM_KEYCHAIN_PASSWORD $KEYCHAIN_PATH
+          # Definisci un percorso e una password temporanea per il keychain
+          KEYCHAIN_PATH=$HOME/Library/Keychains/build.keychain-db
+          KEYCHAIN_PASSWORD="codemagic_temporary_password"
+
+          # Crea il keychain con la nostra password
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-          security unlock-keychain -p $CM_KEYCHAIN_PASSWORD $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           
-          # Importa la chiave privata e il certificato nel portachiavi
-          security import /tmp/private.key -k $KEYCHAIN_PATH -P $CERTIFICATE_PRIVATE_KEY_PASSWORD -A
+          # Importa la chiave privata e il certificato nel nostro nuovo keychain
+          security import /tmp/private.key -k $KEYCHAIN_PATH -P "$CERTIFICATE_PRIVATE_KEY_PASSWORD" -A
           security import /tmp/distribution.cer -k $KEYCHAIN_PATH -A
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           
           # Installa il provisioning profile
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp /tmp/profile.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/"
+      # --- FINE BLOCCO SCRIPT RISCRITTO ---
       - name: Install npm dependencies
         script: | 
           npm install
@@ -45,9 +52,8 @@ workflows:
           npx cap sync ios
       - name: Build and archive iOS app
         script: | 
-          xcode-project build-ipa \
-            --workspace "ios/App/$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
+          xcode-project use-profiles
+          xcode-project build-ipa --workspace "ios/App/$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
