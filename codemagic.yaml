@@ -1,4 +1,4 @@
-# Versione aggiornata e più robusta del file di configurazione
+# Versione aggiornata con Node.js 20
 workflows:
   capacitor-ios-app-store:
     name: Capacitor iOS App Store Build
@@ -7,10 +7,12 @@ workflows:
       groups:
         - app_store_credentials
       vars:
-        APP_ID: "com.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE ESATTO
+        APP_ID: "ccom.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE ESATTO
         XCODE_WORKSPACE: "App.xcworkspace"
         XCODE_SCHEME: "App"
-      node: 18 # Specifica una versione stabile di Node.js
+      # --- RIGA MODIFICATA ---
+      node: 20 
+      # --- FINE RIGA MODIFICATA ---
     scripts:
       - name: Install npm dependencies
         script: | 
