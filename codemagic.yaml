@@ -1,21 +1,38 @@
-# Versione definitiva che collega l'integrazione al gruppo di variabili corretto
 workflows:
   capacitor-ios-app-store:
     name: Capacitor iOS App Store Build
-    # --- BLOCCO MODIFICATO: Il nome dell'integrazione ora corrisponde al nome del gruppo di variabili ---
-    integrations:
-      app_store_connect: app_store_credentials
-    # --- FINE BLOCCO MODIFICATO ---
     instance_type: mac_mini_m2
     environment:
       groups:
-        - app_store_credentials
+        - apple_credentials  # Usa il nuovo gruppo di variabili
       vars:
-        APP_ID: "com.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE ESATTO
+        APP_ID: "com.steexesimplegames.colorswipeduel" # SOSTITUISCI CON IL TUO ID BUNDLE
         XCODE_WORKSPACE: "App.xcworkspace"
         XCODE_SCHEME: "App"
       node: 20
     scripts:
+      - name: Decode signing files
+        script: | 
+          set -ex # Fail on any error and print commands
+          
+          # Decodifica i file da Base64 e salvali in percorsi temporanei
+          echo $APPLE_CERTIFICATE_BASE64 | base64 --decode > /tmp/distribution.cer
+          echo $PROVISIONING_PROFILE_BASE64 | base64 --decode > /tmp/profile.mobileprovision
+          echo $PRIVATE_KEY_BASE64 | base64 --decode > /tmp/private.key
+          
+          # Crea un portachiavi (keychain) temporaneo e sicuro
+          KEYCHAIN_PATH=$CM_KEYCHAIN_PATH
+          security create-keychain -p $CM_KEYCHAIN_PASSWORD $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p $CM_KEYCHAIN_PASSWORD $KEYCHAIN_PATH
+          
+          # Importa la chiave privata e il certificato nel portachiavi
+          security import /tmp/private.key -k $KEYCHAIN_PATH -P $CERTIFICATE_PRIVATE_KEY_PASSWORD -A
+          security import /tmp/distribution.cer -k $KEYCHAIN_PATH -A
+          
+          # Installa il provisioning profile
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp /tmp/profile.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/"
       - name: Install npm dependencies
         script: | 
           npm install
@@ -26,13 +43,11 @@ workflows:
         script: | 
           npx cap add ios
           npx cap sync ios
-      - name: Set up code signing
-        script: | 
-          app-store-connect fetch-signing-files "$APP_ID" --type IOS_APP_STORE --create
       - name: Build and archive iOS app
         script: | 
-          xcode-project use-profiles
-          xcode-project build-ipa --workspace "ios/App/$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
+          xcode-project build-ipa \
+            --workspace "ios/App/$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
